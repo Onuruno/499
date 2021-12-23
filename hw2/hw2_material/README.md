@@ -1,0 +1,2 @@
+After executing knn.py, the module automaticly saves the accuracy figure for L1 and L2 distance metrics named knn_accuracies.png and prints the accuracy for test set to terminal. You can change the path for the train and test sets from the source code's lines [96,99]
+After executing kmeans.py, the module first saves 10 k_value-objective_function_value figures each starts with random initial clusters (names are plot0.png, plot1.png etc.). Then, it saves a figure containing colorized clusters of each datasets named Clustered_Data.png.
