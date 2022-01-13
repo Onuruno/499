@@ -10,6 +10,8 @@ def entropy(bucket):
     for item in bucket:
         total_example += item
     entropy = 0
+    if(total_example == 0):
+        return entropy
     for i in range(len(bucket)):
         p = (bucket[i]/total_example)
         if(p == 0):
@@ -135,3 +137,65 @@ def chi_squared_test(left_bucket, right_bucket):
     chi_squared = np.sum(np.power(difference, 2)/expected)
     dof = (column-1) * (row-1)
     return chi_squared, dof
+
+def bestSplit(data, labels, num_classes, heuristic_name):
+    num_attr = data.shape[1]
+    
+    best_values = np.zeros((num_attr,2))
+    for attr_index in range(num_attr):
+        values = calculate_split_values(data, labels, num_classes, attr_index, heuristic_name)
+        idx = np.argmax(values[:,1])
+        best_values[attr_index] = values[idx]
+    best_attr_index = np.argmax(best_values[:,1])
+    split_value = best_values[best_attr_index][0]
+    return split_value, best_attr_index
+    
+def splitData(data, labels, split_value, best_attr_index):
+    left_data = np.zeros((0, data.shape[1]))
+    right_data = np.zeros((0, data.shape[1]))
+    left_labels = np.zeros((1,0), dtype=int)
+    right_labels = np.zeros((1,0), dtype=int)
+    
+    for i in range(data.shape[0]):
+        if(data[i][best_attr_index] < split_value):
+            left_data = np.vstack((left_data, data[i]))
+            left_labels = np.append(left_labels, labels[i])
+        else:
+            right_data = np.vstack((right_data, data[i]))
+            right_labels = np.append(right_labels, labels[i])
+    return left_data, left_labels, right_data, right_labels
+
+def getBucket(labels, num_classes):
+    return np.bincount(labels, minlength=num_classes)
+
+def shouldSplit(left_bucket, right_bucket):
+    critical_values = [0.0157,0.211]
+    chi_squared, dof = chi_squared_test(left_bucket, right_bucket)
+    if(chi_squared > critical_values[dof-1]):
+        return True
+    else:
+        return False
+
+def decisionTree(data, labels, num_classes, heuristic_name, k):
+    if(np.all(labels == labels[0])):
+        decisions.append((k,labels[0]))
+        return
+    split_value, best_attr_index = bestSplit(data, labels, num_classes, heuristic_name)
+    left_data, left_labels, right_data, right_labels = splitData(data, labels, split_value, best_attr_index)
+    if(not shouldSplit(getBucket(left_labels, num_classes), getBucket(right_labels, num_classes))):
+        return
+    else:
+        decisions.append((k, split_value, best_attr_index))
+        return [decisionTree(left_data, left_labels, num_classes, heuristic_name, 2*k+1), decisionTree(right_data, right_labels, num_classes, heuristic_name, 2*k+2)]
+    
+train_set = np.load('dt/train_set.npy')
+train_labels = np.load('dt/train_labels.npy')
+decisions = []
+result = decisionTree(train_set, train_labels, 3, 'info_gain', 0)
+
+print(decisions)
+        
+test_set = np.load('dt/test_set.npy')
+test_labels = np.load('dt/test_labels.npy')
+print(test_set)
+print(test_labels)
