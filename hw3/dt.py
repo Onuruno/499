@@ -178,24 +178,41 @@ def shouldSplit(left_bucket, right_bucket):
 
 def decisionTree(data, labels, num_classes, heuristic_name, k):
     if(np.all(labels == labels[0])):
-        decisions.append((k,labels[0]))
+        decisions.extend([[k,labels[0]]])
         return
     split_value, best_attr_index = bestSplit(data, labels, num_classes, heuristic_name)
     left_data, left_labels, right_data, right_labels = splitData(data, labels, split_value, best_attr_index)
     if(not shouldSplit(getBucket(left_labels, num_classes), getBucket(right_labels, num_classes))):
         return
     else:
-        decisions.append((k, split_value, best_attr_index))
+        decisions.extend([[k, split_value, best_attr_index]])
         return [decisionTree(left_data, left_labels, num_classes, heuristic_name, 2*k+1), decisionTree(right_data, right_labels, num_classes, heuristic_name, 2*k+2)]
+
+def getDecisionIndex(decisions, k):
+    for i in range(len(decisions)):
+        if(decisions[i][0] == k):
+            return i
+        
+def makePrediction(data, decisions, k):
+    values = decisions[getDecisionIndex(decisions, k)]
+    if(len(values) == 2):
+        return values[1]
+    else:
+        if(data[values[2]] < values[1]):
+            return makePrediction(data, decisions, 2*k+1)
+        else:
+            return makePrediction(data, decisions, 2*k+2)
     
 train_set = np.load('dt/train_set.npy')
 train_labels = np.load('dt/train_labels.npy')
 decisions = []
 result = decisionTree(train_set, train_labels, 3, 'info_gain', 0)
-
-print(decisions)
-        
+       
 test_set = np.load('dt/test_set.npy')
 test_labels = np.load('dt/test_labels.npy')
 print(test_set)
 print(test_labels)
+test_predictions = np.zeros(test_set.shape[0], dtype=int)
+for i in range(test_set.shape[0]):
+    test_predictions[i] = makePrediction(test_set[i], decisions, 0)
+print(test_predictions)
