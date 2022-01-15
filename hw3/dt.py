@@ -49,6 +49,8 @@ def gini(bucket):
     total_example = 0
     for item in bucket:
         total_example += item
+    if(total_example == 0):
+        return 0
     gini = 1
     for item in bucket:
         gini -= np.power((item/total_example), 2)
@@ -144,10 +146,16 @@ def bestSplit(data, labels, num_classes, heuristic_name):
     best_values = np.zeros((num_attr,2))
     for attr_index in range(num_attr):
         values = calculate_split_values(data, labels, num_classes, attr_index, heuristic_name)
-        idx = np.argmax(values[:,1])
+        if(heuristic_name == 'info_gain'):
+            idx = np.argmax(values[:,1])
+        else:
+            idx = np.argmin(values[:,1])
         best_values[attr_index] = values[idx]
-    best_attr_index = np.argmax(best_values[:,1])
-    split_value = best_values[best_attr_index][0]
+    if(heuristic_name == 'info_gain'):
+        best_attr_index = np.argmax(best_values[:,1])
+    else:
+        best_attr_index = np.argmin(best_values[:,1])
+    split_value = round(best_values[best_attr_index][0], 2)
     return split_value, best_attr_index
     
 def splitData(data, labels, split_value, best_attr_index):
@@ -166,7 +174,7 @@ def splitData(data, labels, split_value, best_attr_index):
     return left_data, left_labels, right_data, right_labels
 
 def getBucket(labels, num_classes):
-    return np.bincount(labels, minlength=num_classes)
+    return np.bincount(np.reshape(labels, labels.size), minlength=num_classes)
 
 def shouldSplit(left_bucket, right_bucket):
     critical_values = [0.0157,0.211]
@@ -176,17 +184,18 @@ def shouldSplit(left_bucket, right_bucket):
     else:
         return False
 
-def decisionTree(data, labels, num_classes, heuristic_name, k):
+def decisionTree(decisions, data, labels, num_classes, heuristic_name, k):
     if(np.all(labels == labels[0])):
         decisions.extend([[k,labels[0]]])
         return
     split_value, best_attr_index = bestSplit(data, labels, num_classes, heuristic_name)
     left_data, left_labels, right_data, right_labels = splitData(data, labels, split_value, best_attr_index)
     if(not shouldSplit(getBucket(left_labels, num_classes), getBucket(right_labels, num_classes))):
+        decisions.extend([[k,labels[0]]])
         return
     else:
         decisions.extend([[k, split_value, best_attr_index]])
-        return [decisionTree(left_data, left_labels, num_classes, heuristic_name, 2*k+1), decisionTree(right_data, right_labels, num_classes, heuristic_name, 2*k+2)]
+        return [decisionTree(decisions, left_data, left_labels, num_classes, heuristic_name, 2*k+1), decisionTree(decisions, right_data, right_labels, num_classes, heuristic_name, 2*k+2)]
 
 def getDecisionIndex(decisions, k):
     for i in range(len(decisions)):
@@ -202,17 +211,53 @@ def makePrediction(data, decisions, k):
             return makePrediction(data, decisions, 2*k+1)
         else:
             return makePrediction(data, decisions, 2*k+2)
-    
+        
+def testTree(test_set, decisions):
+    test_predictions = np.zeros(test_set.shape[0], dtype=int)
+    for i in range(test_set.shape[0]):
+        test_predictions[i] = makePrediction(test_set[i], decisions, 0)
+    return test_predictions
+        
+def printNode(node, size):
+    level = int(np.log2(node[0]+1))
+    if(len(node) == 2):
+        print(' '*5*level + '-> ' + str(node[1]) + '(' + str(size) + ')')
+    else:
+        print(' '*5*level + '-> ' + str(node[1:]) + '(' + str(size) + ')')
+        
+def printTree(decisions, data, k):
+    node = decisions[getDecisionIndex(decisions, k)]
+    printNode(node, np.size(data, axis=0))
+    if(len(node) == 2):
+        return
+    else:
+        return printTree(decisions, data[data[:, node[2]] < node[1]], 2*k+1), printTree(decisions, data[data[:, node[2]] >= node[1]], 2*k+2)
+        
+
 train_set = np.load('dt/train_set.npy')
 train_labels = np.load('dt/train_labels.npy')
-decisions = []
-result = decisionTree(train_set, train_labels, 3, 'info_gain', 0)
-       
+decisions1 = []
+decisions2 = []
+
+decisionTree(decisions1, train_set, train_labels, 3, 'info_gain', 0)
+decisionTree(decisions2, train_set, train_labels, 3, 'avg_gini_index', 0)
+      
 test_set = np.load('dt/test_set.npy')
 test_labels = np.load('dt/test_labels.npy')
-print(test_set)
-print(test_labels)
-test_predictions = np.zeros(test_set.shape[0], dtype=int)
-for i in range(test_set.shape[0]):
-    test_predictions[i] = makePrediction(test_set[i], decisions, 0)
-print(test_predictions)
+
+printTree(decisions1, train_set, 0)
+printTree(decisions1, test_set, 0)
+
+test_predictions = testTree(test_set, decisions1)
+accuracy = 100*np.bincount(np.abs(test_labels-test_predictions))[0]/np.size(test_labels)
+
+print('accuracy: %' + str(accuracy))
+
+printTree(decisions2, train_set, 0)
+printTree(decisions2, test_set, 0)
+
+test_predictions = testTree(test_set, decisions2)
+accuracy = 100*np.bincount(np.abs(test_labels-test_predictions))[0]/np.size(test_labels)
+
+print('accuracy: %' + str(accuracy))
+
