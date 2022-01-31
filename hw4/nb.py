@@ -20,7 +20,14 @@ def estimate_pi(train_labels):
     :return: pi. pi is a dictionary. Its keys are class names and values are their probabilities.
     """
     return {x:train_labels.count(x)/len(train_labels) for x in train_labels}
-    
+
+def theta_helper(train_data, labels, word, label, vocab_size):
+        a,b = 0,0
+        for i in range(len(train_data)):
+            if(labels[i] == label):
+                a += train_data[i].count(word)
+            b += len(train_data[i])
+        return (1+a)/(vocab_size+b)
     
 def estimate_theta(train_data, train_labels, vocab):
     """
@@ -33,7 +40,20 @@ def estimate_theta(train_data, train_labels, vocab):
              second level, the keys are all the words in vocab and the values are their estimated probabilities given
              the first level class name.
     """
+    classes = set(train_labels)
+    theta = {class_name:{} for class_name in classes}
     
+    for class_label in classes:
+        word_dict = {word:theta_helper(train_data, train_labels, word, class_label, len(vocab)) for word in vocab}
+        total_value = 0
+        for word in vocab:
+            total_value += word_dict[word]
+        k = 1/total_value
+        for word in vocab:
+            word_dict[word] *= k
+        theta[class_label] = word_dict
+        
+    return theta
 
 def test(theta, pi, vocab, test_data):
     """
