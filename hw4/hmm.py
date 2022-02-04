@@ -28,6 +28,15 @@ def forward(A, B, pi, O):
                 result[i][j] += result[k][j-1]*A[k][i]*B[i][O[j]]
     return np.sum(result, axis=0)[T-1], result  
 
+def getMax(arr):            #returns maximum element of an array
+    value = arr[0][1]
+    idx = arr[0][0]
+    for item in arr[1:]:
+        if(item[1] > value):
+            value = item[1]
+            idx = item[0]
+    return idx, value
+
 def viterbi(A, B, pi, O):
     """
     Calculates the most likely state sequence given model(A, B, pi) and observation sequence.
@@ -45,16 +54,37 @@ def viterbi(A, B, pi, O):
     M = len(B[0])
     T = len(O)
     
-    result = np.zeros((N, T))
+    result = []
+    for i in range(N):
+        arr = []
+        for j in range(T):
+            arr.append((None, 0.0))
+        result.append(arr)
     
     for j in range(N):
-        result[j][0] = pi[j]*B[j][O[0]]
+        result[j][0] = (None, pi[j]*B[j][O[0]])
     
     for j in range(1,T):
         for i in range(N):
-            values = np.zeros(N)
+            values = []
             for k in range(N):
-                values[k] = result[k][j-1]*A[k][i]*B[i][O[j]]
-            result[i][j] = np.max(values)
-    max_values = np.argmax(result, axis=0)
-    return max_values, result
+                values.append((k, result[k][j-1][1]*A[k][i]*B[i][O[j]]))
+            result[i][j] = getMax(values)
+
+    state_sequence = []
+    idx, final_prob = getMax([row[-1] for row in result])
+    state_sequence.insert(0, [row[-1] for row in result].index((idx, final_prob)))
+    state_sequence.insert(0, idx)
+    
+    for m in range(T-2, 0, -1):
+        idx = result[idx][m][0]
+        state_sequence.insert(0, idx)
+    
+    state_sequence = np.array(state_sequence)
+    
+    delta = np.zeros((0,T))
+    
+    for r in range(N):
+        delta = np.append(delta, [[element[1] for element in result[r]]], axis=0)
+    
+    return state_sequence, delta
